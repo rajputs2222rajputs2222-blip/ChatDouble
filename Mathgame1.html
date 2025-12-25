@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math Drop</title>
+<link rel="manifest" href="manifest.json">
+<style>
+body {margin:0;background:#87ceeb;font-family:Arial;text-align:center;}
+#ui{background:#222;color:white;padding:10px;}
+select,input,button{font-size:16px;padding:5px;margin:3px;}
+canvas{display:block;margin:auto;}
+</style>
+</head>
+<body>
+
+<div id="ui">
+    ❤️ <span id="lives"></span>
+    🏆 Score: <span id="score">0</span>
+    🥇 High: <span id="high">0</span><br>
+    Difficulty:
+    <select id="difficulty">
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
+    </select>
+    <br>
+    Answer:
+    <input type="number" id="answerInput">
+    <button onclick="restartGame()">Restart</button>
+</div>
+
+<canvas id="game" width="400" height="550"></canvas>
+
+<audio id="correctSound" src="https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3"></audio>
+<audio id="missSound" src="https://assets.mixkit.co/sfx/preview/mixkit-game-error-943.mp3"></audio>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const input=document.getElementById("answerInput");
+const diffSelect=document.getElementById("difficulty");
+
+const correctSound=document.getElementById("correctSound");
+const missSound=document.getElementById("missSound");
+
+const GRASS_HEIGHT=80;
+let drops=[],lives,score,baseSpeed,gameOver;
+let highScore=localStorage.getItem("highScore")||0;
+document.getElementById("high").textContent=highScore;
+
+// Unlock sounds on first touch
+document.body.addEventListener("touchstart",()=>{
+    correctSound.play().then(()=>correctSound.pause());
+    missSound.play().then(()=>missSound.pause());
+},{once:true});
+
+function rand(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+function generateProblem(){
+    let d=diffSelect.value,a,b,op,ans;
+    if(d==="easy"){a=rand(1,10);b=rand(1,10);op=Math.random()<0.5?"+":"-";}
+    else if(d==="medium"){a=rand(1,12);b=rand(1,12);op=["+","-","×"][rand(0,2)];}
+    else{op=["+","-","×","÷"][rand(0,3)];if(op==="÷"){b=rand(1,10);ans=rand(1,10);a=b*ans;}else{a=rand(1,15);b=rand(1,15);}}
+    if(op==="+") ans=a+b; if(op==="-") ans=a-b; if(op==="×") ans=a*b;
+    return {x:rand(40,360),y:-20,text:`${a} ${op} ${b}`,answer:ans};
+}
+
+function startDrops(){let count=diffSelect.value==="easy"?2:diffSelect.value==="medium"?3:4;drops=[];for(let i=0;i<count;i++)drops.push(generateProblem());}
+
+function drawGrass(){ctx.fillStyle="#2ecc71";ctx.fillRect(0,canvas.height-GRASS_HEIGHT,canvas.width,GRASS_HEIGHT);}
+function update(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);drawGrass();
+    let speed=baseSpeed+score*0.025;
+    drops.forEach((d,i)=>{
+        d.y+=speed;
+        ctx.fillStyle="#3498db";ctx.beginPath();ctx.arc(d.x,d.y,18,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle="white";ctx.font="14px Arial";ctx.textAlign="center";ctx.fillText(d.text,d.x,d.y+5);
+        if(d.y>canvas.height-GRASS_HEIGHT-10){lives--;missSound.play();navigator.vibrate?.(200);drops[i]=generateProblem();}
+    });
+    document.getElementById("lives").innerHTML="❤️".repeat(lives);
+    document.getElementById("score").textContent=score;
+    if(lives<=0){gameOver=true;if(score>highScore){localStorage.setItem("highScore",score);document.getElementById("high").textContent=score;}
+        ctx.font="30px Arial";ctx.fillStyle="black";ctx.fillText("GAME OVER",200,260);}
+}
+
+input.addEventListener("keydown",e=>{
+    if(e.key==="Enter" && !gameOver){let val=Number(input.value);
+        drops.forEach((d,i)=>{if(val===d.answer){score++;correctSound.play();navigator.vibrate?.(100);drops[i]=generateProblem();}});
+        input.value="";
+    }
+});
+
+function restartGame(){lives=3;score=0;baseSpeed=0.4;gameOver=false;startDrops();input.focus();}
+function loop(){if(!gameOver)update();requestAnimationFrame(loop);}
+restartGame();loop();
+</script>
+
+</body>
+</html>
